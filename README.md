@@ -84,7 +84,7 @@ st$name %<>% factor(levels = variables)
 ggplot(st, aes(x = Timestamp, y = value)) + 
   scale_x_datetime(timezone = "CET") + 
   xlab("Time") +
-  geom_point(aes(col = hostname)) + 
+  geom_point(aes(col = hostname), size = 0.5) + 
   facet_grid(rows = vars(name), scales = "free_y") +
   theme(legend.position="bottom") + scale_colour_brewer(palette = "Set1")
 ```
