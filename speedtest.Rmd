@@ -6,14 +6,14 @@ output:
     keep_md: true
 ---
 
-
+```{r global_options, include = FALSE}
+```
 
 # Install the speedtest command line interface
 
 The tool is called [`speedtest-cli`](https://github.com/sivel/speedtest-cli). The below shell command is for Mac OS X and homebrew. Replace by your favourite package manager.
 
-
-```sh
+```{sh, eval = FALSE}   
 brew install speedtest-cli
 ```
 
@@ -21,30 +21,26 @@ brew install speedtest-cli
 
 This works on Unix-derived systems like Linux and Mac OS X. Edit the crontab using
 
-
-```sh
+```{sh, eval = FALSE}
 env EDITOR=nano crontab -e
 ```
 
 and add a line similar to:
 
-
-```sh
+```{sh, eval = FALSE}
  */5 * * * * /Users/whuber/huber/users/huber/speedtest/run-speedtest-cli.sh
 ```
 
 This will run the shell script `run-speedtest-cli.sh`, which is provided in a separate file, every five 5 minutes. Of course you'll have to adapt the file path to your local setup. Check the documentation of `crontab` if you want to run it at different times or intervals. Make sure the file is executable, with e.g.
 
-
-```sh
+```{sh, eval = FALSE}
 chmod 755 /Users/whuber/huber/users/huber/speedtest/run-speedtest-cli.sh
 ```
 
 
 # Visualize the data
 
-
-```r
+```{r packages, message = FALSE}
 library("readr")
 library("tidyr")
 library("dplyr")
@@ -53,8 +49,7 @@ library("ggplot2")
 ```
 
 Get the CSV header and read the CSV file
-
-```r
+```{r read, message = FALSE}
 hosts = c("spinoza", "boltzmann")
 logfile = "/Users/whuber/Dropbox/speedtest/%s-speedtest.csv"
   
@@ -79,18 +74,13 @@ st %<>% mutate(
 st$name %<>% factor(levels = variables)
 ```
 
-
-```r
+```{r speedtestplot, fig.dim = c(8, 9), results = "hide"}
 ggplot(st, aes(x = Timestamp, y = value)) + 
   scale_x_datetime(timezone = "CET") + 
   xlab("Time") +
   geom_point(aes(col = hostname)) + 
   facet_grid(rows = vars(name), scales = "free_y") +
   theme(legend.position="bottom") + scale_colour_brewer(palette = "Set1")
-```
 
-![](speedtest_files/figure-html/speedtestplot-1.png)<!-- -->
-
-```r
 dev.copy(pdf, file = "speedtest.pdf")
 ```
