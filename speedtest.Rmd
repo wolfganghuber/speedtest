@@ -72,12 +72,14 @@ st$name %<>% factor(levels = variables)
 ```
 
 ```{r speedtestplot, fig.dim = c(9, 8.1), results = "hide"}
-ggplot(st, aes(x = Timestamp, y = value)) + 
+#filter(st, Timestamp >= "2020-04-20") %>%
+st %>%
+ggplot(aes(x = Timestamp, y = value)) + 
   scale_x_datetime(timezone = "CET") + 
   xlab("Time") +
   geom_point(aes(col = hostname), size = 0.5) + 
   facet_grid(rows = vars(name), scales = "free_y") +
   theme(legend.position="bottom") + scale_colour_brewer(palette = "Set1")
 
-dev.copy(pdf, file = "speedtest.pdf")
+dev.copy(pdf, file = "speedtest.pdf", width = 16, height = 8)
 ```
