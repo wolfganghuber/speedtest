@@ -9,4 +9,4 @@ echo $RES >> /Users/whuber/Dropbox/speedtest/`hostname -s`-speedtest.csv
 
 # CSV column headers:
 # [1] "Server ID"   "Sponsor"     "Server Name" "Timestamp"   "Distance"
-# [6] "Ping"        "Download"    "Upload"      "Share"       "IP Address" if
+# [6] "Ping"        "Download"    "Upload"      "Share"       "IP Address"
