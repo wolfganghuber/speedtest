@@ -71,6 +71,12 @@ st %<>% mutate(
 st$name %<>% factor(levels = variables)
 ```
 
+```{r table}
+with(st,
+  table(ifelse(is.na(Download), "NA", ifelse(Download==0, "0", ">0")), 
+        hostname))
+```
+
 TO DO: may have to stratify by  "IP Address" to analyze Unitymedia broadband separately from Telekom LTE
 
 ```{r speedtestplot, fig.dim = c(9, 8.1), results = "hide"}
