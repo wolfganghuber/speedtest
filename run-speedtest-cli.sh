@@ -1,6 +1,5 @@
 #/bin/bash
 RES=`/usr/local/bin/speedtest-cli --csv 2> /dev/null`  
-echo $RES
 if [ -z "$RES" ]
 then
   RES="NA,NA,NA,`gdate --utc +%FT%TZ`,NA,NA,NA,NA,NA,NA"
