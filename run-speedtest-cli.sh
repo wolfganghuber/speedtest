@@ -4,7 +4,7 @@ if [ -z "$RES" ]
 then
   RES="NA,NA,NA,`/usr/local/bin/gdate --utc +%FT%TZ`,NA,NA,NA,NA,NA,NA"
 fi
-echo "$RES">> /Users/whuber/Dropbox/speedtest/`hostname -s`-speedtest.csv
+echo "$RES">> /Users/whuber/Dropbox/speedtest/speedtest-`hostname -s`.csv
 
 # CSV column headers:
 # [1] "Server ID"   "Sponsor"     "Server Name" "Timestamp"   "Distance"
