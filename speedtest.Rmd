@@ -59,9 +59,6 @@ st = lapply(hosts, function(h) {
   mutate(hostname = h)
 }) %>% bind_rows 
 
-for (j in c("Timestamp", "Download", "Upload", "Ping"))
-  stopifnot(all(is.finite(st[[j]])))
-
 variables = c("Download (MB/s)", "Upload (MB/s)", "log10 Ping (ms)")
 st %<>% mutate(
   `Download (MB/s)` = Download / 2^23,
@@ -75,6 +72,12 @@ st$name %<>% factor(levels = variables)
 with(st,
   table(ifelse(is.na(Download), "NA", ifelse(Download==0, "0", ">0")), 
         hostname))
+
+stopifnot(all(is.finite(st$Timestamp)))
+is_fin = is.finite(st$Download)
+stopifnot(identical(is_fin, is.finite(st$Upload)),
+          identical(is_fin, is.finite(st$Ping)))
+table(is_fin)
 ```
 
 TO DO: may have to stratify by  "IP Address" to analyze Unitymedia broadband separately from Telekom LTE
