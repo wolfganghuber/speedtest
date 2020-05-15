@@ -48,7 +48,7 @@ library("ggplot2")
 Get the CSV header and read the CSV file
 ```{r read, message = FALSE}
 hosts = c("spinoza", "boltzmann")
-logfile = "/Users/whuber/Dropbox/speedtest/%s-speedtest.csv"
+logfile = "/Users/whuber/Dropbox/speedtest/speedtest-%s.csv"
   
 header = system2("speedtest-cli", args = c("--csv-header"), stdout = TRUE)  %>%
   strsplit(split = ",") %>% `[[`(1)
@@ -59,6 +59,14 @@ st = lapply(hosts, function(h) {
   mutate(hostname = h)
 }) %>% bind_rows 
 
+stopifnot(all(is.finite(st$Timestamp)))
+is_fin = is.finite(st$Download)
+stopifnot(identical(is_fin, is.finite(st$Upload)),
+          identical(is_fin, is.finite(st$Ping)))
+with(st,
+  table(ifelse(is.na(Download), "NA", ifelse(Download==0, "0", ">0")), 
+        hostname))
+
 variables = c("Download (MB/s)", "Upload (MB/s)", "log10 Ping (ms)")
 st %<>% mutate(
   `Download (MB/s)` = Download / 2^23,
@@ -66,18 +74,6 @@ st %<>% mutate(
   `log10 Ping (ms)` = log10(Ping)) %>% 
    pivot_longer(cols = all_of(variables))
 st$name %<>% factor(levels = variables)
-```
-
-```{r table}
-with(st,
-  table(ifelse(is.na(Download), "NA", ifelse(Download==0, "0", ">0")), 
-        hostname))
-
-stopifnot(all(is.finite(st$Timestamp)))
-is_fin = is.finite(st$Download)
-stopifnot(identical(is_fin, is.finite(st$Upload)),
-          identical(is_fin, is.finite(st$Ping)))
-table(is_fin)
 ```
 
 TO DO: may have to stratify by  "IP Address" to analyze Unitymedia broadband separately from Telekom LTE
