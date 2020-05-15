@@ -81,11 +81,12 @@ TO DO: may have to stratify by  "IP Address" to analyze Unitymedia broadband sep
 ```{r speedtestplot, fig.dim = c(9, 8.1), results = "hide"}
 #filter(st, Timestamp >= "2020-04-20") %>%
 st %>%
-ggplot(aes(x = Timestamp, y = value)) + 
-  scale_x_datetime(timezone = "CET") + 
+ggplot(aes(x = Timestamp, y = ifelse(is.na(value), 0, value))) + 
+  scale_x_datetime(timezone = "I_would_like_this_to_be_CET_but_it_is_ignored_by_ggplot2") + 
   xlab("Time") +
-  geom_point(aes(col = hostname), size = 0.5) + 
+  geom_point(aes(col = hostname, shape = is.na(value)), size = 0.5) + 
   facet_grid(rows = vars(name), scales = "free_y") +
+  scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4)) +
   theme(legend.position="bottom") + scale_colour_brewer(palette = "Set1")
 
 dev.copy(pdf, file = "speedtest.pdf", width = 16, height = 8)
