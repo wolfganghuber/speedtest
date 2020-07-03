@@ -76,18 +76,31 @@ st %<>% mutate(
 st$name %<>% factor(levels = variables)
 ```
 
-TO DO: may have to stratify by  "IP Address" to analyze Unitymedia broadband separately from Telekom LTE
+Stratify by  "IP Address", which indicates whether the measurement was taken in Unitymedia broadband, LTE Telekom or at work at EMBL.
+
+The `stopifnot` call makes sure that all instances of `IP Address` that are not `NA` are one of the three addresses below. 
+Subsequently we assume that the cases where `IP Address` is `NA` were at home, i.e. in the Unitymedia network.
+
+```{r servers}
+servers = c(Unitymedia = "176.199.210.217", EMBL = "194.94.44.220", Telekom = "80.187.97.51")
+mt = match(st$`IP Address`, servers)
+stopifnot(all( (!is.na(mt)) | is.na(st$`IP Address`) ))
+st$network = names(servers)[ifelse(is.na(mt), 1, mt)]
+```
 
 ```{r speedtestplot, fig.dim = c(9, 8.1), results = "hide"}
-#filter(st, Timestamp >= "2020-04-20") %>%
-st %>%
-ggplot(aes(x = Timestamp, y = ifelse(is.na(value), 0, value))) + 
-  scale_x_datetime(timezone = "I_would_like_this_to_be_CET_but_it_is_ignored_by_ggplot2") + 
-  xlab("Time") +
-  geom_point(aes(col = hostname, shape = is.na(value)), size = 0.5) + 
-  facet_grid(rows = vars(name), scales = "free_y") +
-  scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4)) +
-  theme(legend.position="bottom") + scale_colour_brewer(palette = "Set1")
-
-dev.copy(pdf, file = "speedtest.pdf", width = 16, height = 8)
+makeplot = function(x, thenetwork, from = "2020-01-01", to = "2020-12-31") {
+  x = filter(x, Timestamp >= from & Timestamp <= to & network == thenetwork) 
+  print(ggplot(x, aes(x = Timestamp, y = ifelse(is.na(value), 0, value))) + 
+    # Sadly, it seems that the below timezone setting is ignored by ggplot2
+    scale_x_datetime(timezone = "CEST") + 
+    xlab("Time") + ylab("Value") + 
+    geom_point(aes(col = hostname, shape = is.na(value)), size = 0.5) + 
+    facet_grid(rows = vars(name), scales = "free_y") +
+    scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4)) +
+    theme(legend.position="bottom") + scale_colour_brewer(palette = "Set1") +
+    guides(`is.na(value)` = FALSE)) 
+  dev.copy(pdf, file = sprintf("speedtest_%s.pdf", thenetwork), width = 16, height = 8)
+}
+makeplot(st, thenetwork = "Unitymedia")
 ```
