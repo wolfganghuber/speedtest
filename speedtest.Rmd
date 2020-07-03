@@ -67,6 +67,12 @@ with(st,
   table(ifelse(is.na(Download), "NA", ifelse(Download==0, "0", ">0")), 
         hostname))
 
+negping = (st$Ping <= 0)
+if (any(negping)) {
+  print(st[which(negping), ])
+  st = filter(st, (!negping) | is.na(st$Ping))  
+}
+
 variables = c("Download (MB/s)", "Upload (MB/s)", "log10 Ping (ms)")
 st %<>% mutate(
   `Download (MB/s)` = Download / 2^23,
@@ -91,16 +97,17 @@ st$network = names(servers)[ifelse(is.na(mt), 1, mt)]
 ```{r speedtestplot, fig.dim = c(9, 8.1), results = "hide"}
 makeplot = function(x, thenetwork, from = "2020-01-01", to = "2020-12-31") {
   x = filter(x, Timestamp >= from & Timestamp <= to & network == thenetwork) 
-  print(ggplot(x, aes(x = Timestamp, y = ifelse(is.na(value), 0, value))) + 
+  ggplot(x, aes(x = Timestamp, y = ifelse(is.na(value), 0, value))) + 
     # Sadly, it seems that the below timezone setting is ignored by ggplot2
     scale_x_datetime(timezone = "CEST") + 
     xlab("Time") + ylab("Value") + 
-    geom_point(aes(col = hostname, shape = is.na(value)), size = 0.5) + 
+    geom_point(aes(col = hostname, shape = is.na(value), size = is.na(value))) + 
     facet_grid(rows = vars(name), scales = "free_y") +
     scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4)) +
-    theme(legend.position="bottom") + scale_colour_brewer(palette = "Set1") +
-    guides(`is.na(value)` = FALSE)) 
-  dev.copy(pdf, file = sprintf("speedtest_%s.pdf", thenetwork), width = 16, height = 8)
-}
+    scale_size_manual(values = c("FALSE" = 0.5, "TRUE" = 1.5)) +
+    theme(legend.position = "bottom") + scale_colour_brewer(palette = "Set1") +
+    guides(shape = "none", size = "none")
+ }
 makeplot(st, thenetwork = "Unitymedia")
+dev.copy(pdf, file = "speedtest.pdf", width = 16, height = 8)
 ```
