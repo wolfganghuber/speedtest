@@ -8,11 +8,11 @@ output:
 
 # Install the speedtest command line interface
 
-The tool is called [`speedtest-cli`](https://github.com/sivel/speedtest-cli). The below shell command is for Mac OS X and homebrew. Replace by your favourite package manager.
+The tool is called [`speedtest-cli`](https://github.com/sivel/speedtest-cli). The script also calls `gdate`, which homebrew provides in `coreutils`. The below shell commands are for Mac OS X and homebrew. Replace by your favourite package manager.
 
 
 ```sh
-brew install speedtest-cli
+brew install speedtest-cli coreutils
 ```
 
 # Set up crontab to run it in regular intervals
@@ -53,7 +53,7 @@ library("ggplot2")
 Get the CSV header and read the CSV file
 
 ```r
-hosts = c("spinoza", "boltzmann")
+hosts = c("spinoza", "boltzmann")[1]
 logfile = "/Users/whuber/Dropbox/speedtest/speedtest-%s.csv"
   
 header = system2("speedtest-cli", args = c("--csv-header"), stdout = TRUE)  %>%
@@ -76,14 +76,14 @@ with(st,
 
 ```
 ##     hostname
-##      boltzmann spinoza
-##   >0      1931    3140
-##   0         25       5
-##   NA        40      76
+##      spinoza
+##   >0    1682
+##   0        3
+##   NA      21
 ```
 
 ```r
-negping = (st$Ping <= 0)
+negping = (!is.na(st$Ping) & (st$Ping <= 0))
 if (any(negping)) {
   print(st[which(negping), ])
   st = filter(st, (!negping) | is.na(st$Ping))  
@@ -91,23 +91,20 @@ if (any(negping)) {
 ```
 
 ```
-## # A tibble: 2 x 11
-##   `Server ID` Sponsor `Server Name` Timestamp           Distance   Ping Download
-##         <dbl> <chr>   <chr>         <dttm>                 <dbl>  <dbl>    <dbl>
-## 1       25942 fiberO… Darmstadt     2020-06-16 11:13:33     47.5  -3.81   3.51e6
-## 2       10291 TWL-KOM Ludwigshafen  2020-06-08 00:48:27     20.0 -29.4    3.03e7
+## # A tibble: 1 x 11
+##   `Server ID` Sponsor `Server Name` Timestamp           Distance  Ping Download
+##         <dbl> <chr>   <chr>         <dttm>                 <dbl> <dbl>    <dbl>
+## 1       38469 Diamon… Limburg An D… 2020-12-27 12:59:02     115. -64.0   2.53e7
 ## # … with 4 more variables: Upload <dbl>, Share <lgl>, `IP Address` <chr>,
 ## #   hostname <chr>
 ```
 
 ```r
-variables = c("Download (MB/s)", "Upload (MB/s)", "log10 Ping (ms)")
+variables = c("Download (Mb/s)", "Upload (Mb/s)", "log10 Ping (ms)")
 st %<>% mutate(
-  `Download (MB/s)` = Download / 2^23,
-  `Upload (MB/s)` = Upload / 2^23,
-  `log10 Ping (ms)` = log10(Ping)) %>% 
-   pivot_longer(cols = all_of(variables))
-st$name %<>% factor(levels = variables)
+  `Download (Mb/s)` = Download / 2^20,
+  `Upload (Mb/s)` = Upload / 2^20,
+  `log10 Ping (ms)` = log10(Ping))
 ```
 
 Stratify by  "IP Address", which indicates whether the measurement was taken in Unitymedia broadband, LTE Telekom or at work at EMBL.
@@ -117,32 +114,81 @@ Subsequently we assume that the cases where `IP Address` is `NA` were at home, i
 
 
 ```r
-servers = c(Unitymedia = "176.199.210.217", EMBL = "194.94.44.220", Telekom = "80.187.97.51")
-mt = match(st$`IP Address`, servers)
-stopifnot(all( (!is.na(mt)) | is.na(st$`IP Address`) ))
-st$network = names(servers)[ifelse(is.na(mt), 1, mt)]
+servers = c(Unitymedia    = "176.199.211.22", 
+            EMBL          = "194.94.44.220", 
+            `Telekom-LTE` = "80.187.97.*")
+st$network = rep(NA_character_, nrow(st))
+for (nm in names(servers)) 
+  st$network[ grep(servers[nm], st$`IP Address`) ] = nm
+stopifnot(all(!is.na(st$network) | is.na(st$`IP Address`)))
+```
+
+Epochs. The running median line will be plotted separately for each epoch. Here the assumption is that consecutive measurements were taken about 5 minutes apart (i.e., well less than 7 minutes).
+
+
+```r
+newepoch = (diff(st$Timestamp) > as.difftime(7,  units = "mins"))
+st$epoch = as.factor(c(0L, cumsum(as.numeric(newepoch))))
+```
+
+Pivot to long format for plotting.
+
+
+```r
+st %<>% pivot_longer(cols = variables)
+```
+
+```
+## Note: Using an external vector in selections is ambiguous.
+## ℹ Use `all_of(variables)` instead of `variables` to silence this message.
+## ℹ See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>.
+## This message is displayed once per session.
+```
+
+```r
+st$name %<>% factor(levels = variables)
+```
+
+Smooth. Running median with window size +/- 12 min, i.e. in practice these are the 5 measurements t-10, t-5, t, t+5, t+10.
+
+
+```r
+delta = as.difftime(12,  units = "mins")
+st$value_s = rep(NA_real_, nrow(st))
+
+for (i in which(!is.na(st$network))) {
+  k = which(with(st,  
+      (abs(Timestamp - Timestamp[i]) <= delta) &
+      (name == name[i]) &
+      (network == network[i])))
+  stopifnot(length(k)>=1)
+  st$value_s[i] = median(st$value[k], na.rm = TRUE)    
+}
 ```
 
 
 ```r
-makeplot = function(x, thenetwork, from = "2020-01-01", to = "2020-12-31") {
-  x = filter(x, Timestamp >= from & Timestamp <= to & network == thenetwork) 
-  ggplot(x, aes(x = Timestamp, y = ifelse(is.na(value), 0, value))) + 
+makeplot = function(x, networks, from = "2021-01-07", to = "2021-12-31") {
+  x = filter(x, (Timestamp >= from) & (Timestamp <= to) & (network %in% networks)) 
+  ggplot(x, aes(x = Timestamp)) + 
     # Sadly, it seems that the below timezone setting is ignored by ggplot2
-    scale_x_datetime(timezone = "CEST") + 
+    scale_x_datetime(timezone = "CET") + 
     xlab("Time") + ylab("Value") + 
-    geom_point(aes(col = hostname, shape = is.na(value), size = is.na(value))) + 
+    geom_point(aes(y = ifelse(is.na(value), 0, value), 
+                   col = network, shape = is.na(value), size = is.na(value))) + 
+    geom_line(aes(y = ifelse(is.na(value_s), 0, value_s), group = epoch), col = "#777777", size = 0.4) + 
     facet_grid(rows = vars(name), scales = "free_y") +
-    scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4)) +
-    scale_size_manual(values = c("FALSE" = 0.5, "TRUE" = 1.5)) +
-    theme(legend.position = "bottom") + scale_colour_brewer(palette = "Set1") +
+    scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 4)) +
+    scale_size_manual(values = c(`FALSE` = 0.75, `TRUE` = 1.5)) +
+    scale_color_manual(values = c(Unitymedia = "black", `Telekom-LTE` = "magenta")) +
+    theme(legend.position = "bottom") + 
     guides(shape = "none", size = "none")
  }
-makeplot(st, thenetwork = "Unitymedia")
+makeplot(st, networks = c("Unitymedia", "Telekom-LTE")[1])
 ```
 
-![](speedtest_files/figure-html/speedtestplot-1.png)<!-- -->
+![The dots show the measurements taken every 5 minutes (e.g., 11:00, 11:05, 11:10, ...). The lines show the running median across the neighbouring +/- 10 minutes.](speedtest_files/figure-html/speedtestplot-1.png)
 
 ```r
-dev.copy(pdf, file = "speedtest.pdf", width = 16, height = 8)
+#dev.copy(pdf, file = "speedtest.pdf", width = 16, height = 8)
 ```
