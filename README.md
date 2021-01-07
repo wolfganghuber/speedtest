@@ -77,7 +77,7 @@ with(st,
 ```
 ##     hostname
 ##      spinoza
-##   >0    1682
+##   >0    1684
 ##   0        3
 ##   NA      21
 ```
@@ -135,21 +135,11 @@ Pivot to long format for plotting.
 
 
 ```r
-st %<>% pivot_longer(cols = variables)
-```
-
-```
-## Note: Using an external vector in selections is ambiguous.
-## ℹ Use `all_of(variables)` instead of `variables` to silence this message.
-## ℹ See <https://tidyselect.r-lib.org/reference/faq-external-vector.html>.
-## This message is displayed once per session.
-```
-
-```r
+st %<>% pivot_longer(cols = all_of(variables))
 st$name %<>% factor(levels = variables)
 ```
 
-Smooth. Running median with window size +/- 12 min, i.e. in practice these are the 5 measurements t-10, t-5, t, t+5, t+10.
+Smooth. Running median with window size +/- 12 min, i.e., in practice these are the 5 measurements t-10, t-5, t, t+5, t+10. The for loop and esp. computation of `k` is a bit clumsy and inefficient here; but it works.
 
 
 ```r

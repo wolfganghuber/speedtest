@@ -105,11 +105,11 @@ st$epoch = as.factor(c(0L, cumsum(as.numeric(newepoch))))
 Pivot to long format for plotting.
 
 ```{r pivot}
-st %<>% pivot_longer(cols = variables)
+st %<>% pivot_longer(cols = all_of(variables))
 st$name %<>% factor(levels = variables)
 ```
 
-Smooth. Running median with window size +/- 12 min, i.e. in practice these are the 5 measurements t-10, t-5, t, t+5, t+10.
+Smooth. Running median with window size +/- 12 min, i.e., in practice these are the 5 measurements t-10, t-5, t, t+5, t+10. The for loop and esp. computation of `k` is a bit clumsy and inefficient here; but it works.
 
 ```{r smooth}
 delta = as.difftime(12,  units = "mins")
