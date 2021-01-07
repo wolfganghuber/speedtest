@@ -8,29 +8,30 @@ output:
 
 # Install the speedtest command line interface
 
-The tool is called [`speedtest-cli`](https://github.com/sivel/speedtest-cli). The below shell command is for Mac OS X and homebrew. Replace by your favourite package manager.
+The tool is called [`speedtest-cli`](https://github.com/sivel/speedtest-cli). The script also calls `gdate`. The below shell commands are for Mac OS X and homebrew. Replace by your favourite package manager.
 
 ```{sh, eval = FALSE}   
 brew install speedtest-cli
+brew install coreutils # for gdate
 ```
 
 # Set up crontab to run it in regular intervals
 
 This works on Unix-derived systems like Linux and Mac OS X. Edit the crontab using
 
-```{sh, eval = FALSE}
+```{sh crontab1, eval = FALSE}
 env EDITOR=nano crontab -e
 ```
 
 and add a line similar to:
 
-```{sh, eval = FALSE}
+```{sh crontab2, eval = FALSE}
  */5 * * * * /Users/whuber/svnco/speedtest/run-speedtest-cli.sh
 ```
 
 This will run the shell script `run-speedtest-cli.sh`, which is provided in a separate file, every 5 minutes. Of course you'll have to adapt the file path to your local setup. Check the documentation of `crontab` if you want to run it at different times or intervals. Make sure the file is executable, with e.g.
 
-```{sh, eval = FALSE}
+```{sh chmod, eval = FALSE}
 chmod 755 /Users/whuber/svnco/speedtest/run-speedtest-cli.sh
 ```
 
@@ -47,7 +48,7 @@ library("ggplot2")
 
 Get the CSV header and read the CSV file
 ```{r read, message = FALSE}
-hosts = c("spinoza", "boltzmann")
+hosts = c("spinoza", "boltzmann")[1]
 logfile = "/Users/whuber/Dropbox/speedtest/speedtest-%s.csv"
   
 header = system2("speedtest-cli", args = c("--csv-header"), stdout = TRUE)  %>%
@@ -67,16 +68,16 @@ with(st,
   table(ifelse(is.na(Download), "NA", ifelse(Download==0, "0", ">0")), 
         hostname))
 
-negping = (st$Ping <= 0)
+negping = (!is.na(st$Ping) & (st$Ping <= 0))
 if (any(negping)) {
   print(st[which(negping), ])
   st = filter(st, (!negping) | is.na(st$Ping))  
 }
 
-variables = c("Download (MB/s)", "Upload (MB/s)", "log10 Ping (ms)")
+variables = c("Download (Mb/s)", "Upload (Mb/s)", "log10 Ping (ms)")
 st %<>% mutate(
-  `Download (MB/s)` = Download / 2^23,
-  `Upload (MB/s)` = Upload / 2^23,
+  `Download (Mb/s)` = Download / 2^20,
+  `Upload (Mb/s)` = Upload / 2^20,
   `log10 Ping (ms)` = log10(Ping)) %>% 
    pivot_longer(cols = all_of(variables))
 st$name %<>% factor(levels = variables)
@@ -88,26 +89,30 @@ The `stopifnot` call makes sure that all instances of `IP Address` that are not 
 Subsequently we assume that the cases where `IP Address` is `NA` were at home, i.e. in the Unitymedia network.
 
 ```{r servers}
-servers = c(Unitymedia = "176.199.210.217", EMBL = "194.94.44.220", Telekom = "80.187.97.51")
-mt = match(st$`IP Address`, servers)
-stopifnot(all( (!is.na(mt)) | is.na(st$`IP Address`) ))
-st$network = names(servers)[ifelse(is.na(mt), 1, mt)]
+servers = c(Unitymedia    = "176.199.211.22", 
+            EMBL          = "194.94.44.220", 
+            `Telekom-LTE` = "80.187.97.*")
+st$network = rep(NA_character_, nrow(st))
+for (nm in names(servers)) 
+  st$network[ grep(servers[nm], st$`IP Address`) ] = nm
+stopifnot(all(!is.na(st$network) | is.na(st$`IP Address`)))
 ```
 
 ```{r speedtestplot, fig.dim = c(9, 8.1), results = "hide"}
-makeplot = function(x, thenetwork, from = "2020-01-01", to = "2020-12-31") {
-  x = filter(x, Timestamp >= from & Timestamp <= to & network == thenetwork) 
+makeplot = function(x, networks, from = "2020-01-01", to = "2020-12-31") {
+  x = filter(x, Timestamp >= from & Timestamp <= to & network %in% networks) 
   ggplot(x, aes(x = Timestamp, y = ifelse(is.na(value), 0, value))) + 
     # Sadly, it seems that the below timezone setting is ignored by ggplot2
-    scale_x_datetime(timezone = "CEST") + 
+    scale_x_datetime(timezone = "CET") + 
     xlab("Time") + ylab("Value") + 
-    geom_point(aes(col = hostname, shape = is.na(value), size = is.na(value))) + 
+#    geom_point(aes(col = hostname, shape = is.na(value), size = is.na(value))) + 
+    geom_point(aes(col = network, shape = is.na(value), size = is.na(value))) + 
     facet_grid(rows = vars(name), scales = "free_y") +
     scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4)) +
     scale_size_manual(values = c("FALSE" = 0.5, "TRUE" = 1.5)) +
     theme(legend.position = "bottom") + scale_colour_brewer(palette = "Set1") +
     guides(shape = "none", size = "none")
  }
-makeplot(st, thenetwork = "Unitymedia")
+makeplot(st, networks = c("Unitymedia", "Telekom-LTE"))
 dev.copy(pdf, file = "speedtest.pdf", width = 16, height = 8)
 ```
