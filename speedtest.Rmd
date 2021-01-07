@@ -8,11 +8,10 @@ output:
 
 # Install the speedtest command line interface
 
-The tool is called [`speedtest-cli`](https://github.com/sivel/speedtest-cli). The script also calls `gdate`. The below shell commands are for Mac OS X and homebrew. Replace by your favourite package manager.
+The tool is called [`speedtest-cli`](https://github.com/sivel/speedtest-cli). The script also calls `gdate`, which homebrew provides in `coreutils`. The below shell commands are for Mac OS X and homebrew. Replace by your favourite package manager.
 
 ```{sh, eval = FALSE}   
-brew install speedtest-cli
-brew install coreutils # for gdate
+brew install speedtest-cli coreutils
 ```
 
 # Set up crontab to run it in regular intervals
@@ -78,9 +77,7 @@ variables = c("Download (Mb/s)", "Upload (Mb/s)", "log10 Ping (ms)")
 st %<>% mutate(
   `Download (Mb/s)` = Download / 2^20,
   `Upload (Mb/s)` = Upload / 2^20,
-  `log10 Ping (ms)` = log10(Ping)) %>% 
-   pivot_longer(cols = all_of(variables))
-st$name %<>% factor(levels = variables)
+  `log10 Ping (ms)` = log10(Ping))
 ```
 
 Stratify by  "IP Address", which indicates whether the measurement was taken in Unitymedia broadband, LTE Telekom or at work at EMBL.
@@ -98,21 +95,52 @@ for (nm in names(servers))
 stopifnot(all(!is.na(st$network) | is.na(st$`IP Address`)))
 ```
 
-```{r speedtestplot, fig.dim = c(9, 8.1), results = "hide"}
-makeplot = function(x, networks, from = "2020-01-01", to = "2020-12-31") {
+Epoch
+
+```{r epoch}
+newepoch = (diff(st$Timestamp) > as.difftime(7,  units = "mins"))
+st$epoch = as.factor(c(0L, cumsum(as.numeric(newepoch))))
+```
+
+Pivot to long format for plotting.
+
+```{r pivot}
+st %<>% pivot_longer(cols = variables)
+st$name %<>% factor(levels = variables)
+```
+
+Smooth
+
+```{r smooth}
+delta = as.difftime(12,  units = "mins")
+st$value_s = rep(NA_real_, nrow(st))
+
+for (i in which(!is.na(st$network))) {
+  k = which(with(st,  
+      (abs(Timestamp - Timestamp[i]) <= delta) &
+      (name == name[i]) &
+      (network == network[i])))
+  stopifnot(length(k)>=1)
+  st$value_s[i] = median(st$value[k], na.rm = TRUE)    
+}
+```
+
+```{r speedtestplot, fig.dim = c(10, 8.1), results = "hide"}
+makeplot = function(x, networks, from = "2021-01-01", to = "2021-01-10") {
   x = filter(x, Timestamp >= from & Timestamp <= to & network %in% networks) 
-  ggplot(x, aes(x = Timestamp, y = ifelse(is.na(value), 0, value))) + 
+  ggplot(x, aes(x = Timestamp)) + 
     # Sadly, it seems that the below timezone setting is ignored by ggplot2
     scale_x_datetime(timezone = "CET") + 
     xlab("Time") + ylab("Value") + 
-#    geom_point(aes(col = hostname, shape = is.na(value), size = is.na(value))) + 
-    geom_point(aes(col = network, shape = is.na(value), size = is.na(value))) + 
+    geom_point(aes(y = ifelse(is.na(value), 0, value), col = network, shape = is.na(value), size = is.na(value))) + 
+    geom_line(aes(y = ifelse(is.na(value_s), 0, value_s), col = epoch)) + 
     facet_grid(rows = vars(name), scales = "free_y") +
-    scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4)) +
-    scale_size_manual(values = c("FALSE" = 0.5, "TRUE" = 1.5)) +
-    theme(legend.position = "bottom") + scale_colour_brewer(palette = "Set1") +
+    scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 4)) +
+    scale_size_manual(values = c(`FALSE` = 0.5, `TRUE` = 1.5)) +
+    #scale_color_manual(values = c(Unitymedia = "black", `Telekom-LTE` = "magenta")) +
+    theme(legend.position = "bottom") + 
     guides(shape = "none", size = "none")
  }
-makeplot(st, networks = c("Unitymedia", "Telekom-LTE"))
-dev.copy(pdf, file = "speedtest.pdf", width = 16, height = 8)
+makeplot(st, networks = c("Unitymedia", "Telekom-LTE")[1])
+#dev.copy(pdf, file = "speedtest.pdf", width = 16, height = 8)
 ```
