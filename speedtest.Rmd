@@ -73,11 +73,11 @@ if (any(negping)) {
   st = filter(st, (!negping) | is.na(st$Ping))  
 }
 
-variables = c("Download (Mb/s)", "Upload (Mb/s)", "log10 Ping (ms)")
+variables = c("Download (Mb/s)", "Upload (Mb/s)", "-log10 Ping (ms)")
 st %<>% mutate(
   `Download (Mb/s)` = Download / 2^20,
   `Upload (Mb/s)` = Upload / 2^20,
-  `log10 Ping (ms)` = log10(Ping))
+  `-log10 Ping (ms)` = -log10(Ping))
 ```
 
 Stratify by  "IP Address", which indicates whether the measurement was taken in Unitymedia broadband, LTE Telekom or at work at EMBL.
