@@ -109,6 +109,12 @@ st %<>% pivot_longer(cols = all_of(variables))
 st$name %<>% factor(levels = variables)
 ```
 
+```{r subset}
+networks  = c("Unitymedia", "Telekom-LTE")[1]
+from     = "2021-01-07"
+to       = "2021-12-31" 
+st %<>% filter((Timestamp >= from) & (Timestamp <= to) & (network %in% networks))
+```
 Smooth. Running median with window size +/- 12 min, i.e., in practice these are the 5 measurements t-10, t-5, t, t+5, t+10. The for loop and esp. computation of `k` is a bit clumsy and inefficient here; but it works.
 
 ```{r smooth}
@@ -126,8 +132,7 @@ for (i in which(!is.na(st$network))) {
 ```
 
 ```{r speedtestplot, fig.dim = c(10, 8.1), results = "hide", fig.cap = "The dots show the measurements taken every 5 minutes (e.g., 11:00, 11:05, 11:10, ...). The lines show the running median across the neighbouring +/- 10 minutes."}
-makeplot = function(x, networks, from = "2021-01-07", to = "2021-12-31") {
-  x = filter(x, (Timestamp >= from) & (Timestamp <= to) & (network %in% networks)) 
+makeplot = function(x) {
   ggplot(x, aes(x = Timestamp)) + 
     # Sadly, it seems that the below timezone setting is ignored by ggplot2
     scale_x_datetime(timezone = "CET") + 
@@ -142,6 +147,6 @@ makeplot = function(x, networks, from = "2021-01-07", to = "2021-12-31") {
     theme(legend.position = "bottom") + 
     guides(shape = "none", size = "none")
  }
-makeplot(st, networks = c("Unitymedia", "Telekom-LTE")[1])
+makeplot(st)
 #dev.copy(pdf, file = "speedtest.pdf", width = 16, height = 8)
 ```
