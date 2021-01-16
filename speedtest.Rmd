@@ -88,7 +88,7 @@ Subsequently we assume that the cases where `IP Address` is `NA` were at home, i
 ```{r servers}
 servers = c(Unitymedia    = "176.199.211.22", 
             EMBL          = "194.94.44.220", 
-            `Telekom-LTE` = "80.187.97.*")
+            `Telekom-LTE` = "80.187.*.*")
 st$network = rep(NA_character_, nrow(st))
 for (nm in names(servers)) 
   st$network[ grep(servers[nm], st$`IP Address`) ] = nm
