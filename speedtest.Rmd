@@ -88,11 +88,16 @@ Subsequently we assume that the cases where `IP Address` is `NA` were at home, i
 ```{r servers}
 servers = c(Unitymedia    = "176.199.211.22", 
             EMBL          = "194.94.44.220", 
-            `Telekom-LTE` = "80.187.*.*")
+            `Telekom-LTE` = "80.187.*",
+            `Telekom`     = "87.13*")
 st$network = rep(NA_character_, nrow(st))
 for (nm in names(servers)) 
   st$network[ grep(servers[nm], st$`IP Address`) ] = nm
-stopifnot(all(!is.na(st$network) | is.na(st$`IP Address`)))
+st %<>% mutate(
+  unknownserver = !is.na(st$`IP Address`) & is.na(st$network))  
+if (any(st$unknownserver))
+  stop(sprintf("Unknown IP Address(es) %s.\n", 
+               paste(unique(st$`IP Address`[st$unknownserver]), collapse = ", ")))
 ```
 
 Epochs. The running median line will be plotted separately for each epoch. Here the assumption is that consecutive measurements were taken about 5 minutes apart (i.e., well less than 7 minutes).
@@ -110,7 +115,7 @@ st$name %<>% factor(levels = variables)
 ```
 
 ```{r subset}
-networks  = c("Unitymedia", "Telekom-LTE")[1]
+networks  = c("Unitymedia", "Telekom")
 from     = "2021-01-07"
 to       = "2021-12-31" 
 st %<>% filter((Timestamp >= from) & (Timestamp <= to) & (network %in% networks))
@@ -143,7 +148,7 @@ makeplot = function(x) {
     facet_grid(rows = vars(name), scales = "free_y") +
     scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 4)) +
     scale_size_manual(values = c(`FALSE` = 0.75, `TRUE` = 1.5)) +
-    scale_color_manual(values = c(Unitymedia = "black", `Telekom-LTE` = "magenta")) +
+    scale_color_manual(values = c(Unitymedia = "black", `Telekom` = "magenta")) +
     theme(legend.position = "bottom") + 
     guides(shape = "none", size = "none")
  }
