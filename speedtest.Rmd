@@ -123,7 +123,8 @@ st %<>% filter((Timestamp >= from) & (Timestamp <= to) & (network %in% networks)
 Smooth. Running median with window size +/- 12 min, i.e., in practice these are the 5 measurements t-10, t-5, t, t+5, t+10. The for loop and esp. computation of `k` is a bit clumsy and inefficient here; but it works.
 
 ```{r smooth}
-delta = as.difftime(12,  units = "mins")
+winw = 5
+delta = as.difftime((winw-1)/2*5 + 2,  units = "mins")
 st$value_s = rep(NA_real_, nrow(st))
 
 for (i in which(!is.na(st$network))) {
@@ -132,7 +133,8 @@ for (i in which(!is.na(st$network))) {
       (name == name[i]) &
       (network == network[i])))
   stopifnot(length(k)>=1)
-  st$value_s[i] = median(st$value[k], na.rm = TRUE)    
+  if (length(k)==winw) 
+    st$value_s[i] = mean(st$value[k], na.rm = TRUE)    
 }
 ```
 
@@ -144,7 +146,8 @@ makeplot = function(x) {
     xlab("Time") + ylab("Value") + 
     geom_point(aes(y = ifelse(is.na(value), 0, value), 
                    col = network, shape = is.na(value), size = is.na(value))) + 
-    geom_line(aes(y = ifelse(is.na(value_s), 0, value_s), group = epoch), col = "#777777", size = 0.4) + 
+    # geom_line(aes(y = ifelse(is.na(value_s), 0, value_s), group = epoch), col = "#777777", size = 0.4) + 
+    geom_line(aes(y = value_s, group = epoch), col = "#777777", size = 0.4) + 
     facet_grid(rows = vars(name), scales = "free_y") +
     scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 4)) +
     scale_size_manual(values = c(`FALSE` = 0.75, `TRUE` = 1.5)) +
